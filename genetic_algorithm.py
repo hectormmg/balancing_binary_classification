@@ -3,7 +3,9 @@
 """
 Created on Sat Mar  2 09:40:29 2019
 
-@author: German
+@original_author: German Villacorta
+@author: Héctor Morales
+
 """
 
 from helper_functions import *
@@ -20,41 +22,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import f1_score
 
-
-
-def get_fitness(X_train, y_train, X_test, y_test, classifier, metric, originalN):
-    
-    lenP = np.count_nonzero(y_train)
-    lenN = len(y_train) - lenP
-    
-    print("LenP: ", lenP, ", LenN: ", lenN, ", Total: ", len(y_train))
-    
-    if(classifier == "SVM"):
-        clf = svm.SVC(gamma="auto")
-    elif (classifier == "G"):
-        clf = GaussianNB()
-
-    clf.fit(X_train, y_train)
-    prediction = clf.predict(X_test)
-
-    tn, fp, fn, tp = confusion_matrix(y_test, prediction).ravel()
-    
-    if (metric == "accuracy"):
-        accuracy_negative = tp / (tp + tn)
-        accuracy_positive = fp / (fp + fn)
-
-        fitness = 0.5 * (accuracy_negative + accuracy_positive)
-    elif (metric == "kappa"):
-        fitness = cohen_kappa_score(y_test,prediction)
-    elif (metric == "auc"):
-        fitness = roc_auc_score(y_test, prediction)
-    elif (metric == "f1"):
-        fitness = f1_score(y_test, prediction, average='macro')
-        
-    if np.isnan(fitness):
-        fitness = 0.0
-        
-    return fitness - (0.1 * max(lenP,lenN) / min(lenP,lenN))
+from fitness import evaluate
 
     
 def initialize_population(N, M):
@@ -146,7 +114,7 @@ def initialize_specie(X, Y, X_class, XP_class, Y_value, N, is_minority):
     for i in range(0,N):
         Xf, Yf = prepare_data_for_training(X, Y, X, XP_class, population[i], is_minority, Y_value, True)
 
-        fitness = get_fitness(Xf, Yf, X, Y, "SVM", "kappa", originalN)
+        fitness = evaluate(Xf, Yf, X, Y, "SVM", "kappa", originalN)
         population_fitnesses[i] = fitness
 
     return population, population_fitnesses
@@ -168,20 +136,7 @@ def pick_parents(population, fitnesses):
    
     return parents[0], parents[1], parents[2], parents[3]
 
-def main():
-    import sys 
-    sys.argv = [0,0,0,0,0,0]
-    sys.argv[1] = "SVM"
-    sys.argv[2] = "kappa"
-    sys.argv[3] = "datasets/preprocessed/iris.csv"
-    
-    classifier =  sys.argv[1]  
-    metric = sys.argv[2]       
-    data_csv = pd.read_csv(sys.argv[3])              
-    data_csv["Class"] = np.where(data_csv["Class"] == "yes", 1, 0)
-    X = np.array(data_csv.iloc[:, 0:-1])
-    Y = np.array(data_csv.iloc[:, -1])
-    print(Y)
+def train(X, Y, classifier, metric):
     N = 100
     iterations = 100
     prob_mutation = 0.05
@@ -247,7 +202,7 @@ def main():
                 child_dataX = np.append(child_dataX, m_dataX, 0)
                 child_dataY = np.append(child_dataY, m_dataY, 0)
                 
-                child_fitness = get_fitness(child_dataX, child_dataY, X, Y, classifier, metric, original_N)
+                child_fitness = evaluate(child_dataX, child_dataY, X, Y, classifier, metric, original_N)
 
                 # En caso de que el fitness del hijo sea mejor que alguno de los padres
                 # entonces quita ese padre de la poblacion y pon al hijo en su 
@@ -304,7 +259,7 @@ def main():
     X_new = np.append(X1, X2, 0)
     Y_new = np.append(Y1, Y2, 0)
     
-    best_fitness = get_fitness(X_new, Y_new, X, Y, classifier, metric, original_N)
+    best_fitness = evaluate(X_new, Y_new, X, Y, classifier, metric, original_N)
     print("+ Era: ", positive_class.shape, "Es: ", X1.shape)
     print("- Era: ", negative_class.shape, "Es: ", X2.shape)
 
@@ -319,18 +274,3 @@ def main():
     plt.legend()
     
     return X_new, Y_new
-
-
-        
-
-fullx, fy = main()
-fy = np.reshape(fy, (len(fy), 1))
-print(fullx.shape, fy.shape)
-new_dataset = np.append(fullx, fy, axis=1)
-pd.DataFrame(new_dataset).to_csv(sys.argv[3] + "_balanced.csv")
-      
-
-
-
-
-
