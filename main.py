@@ -14,7 +14,7 @@ from genetic_algorithm import train
 def read_system_params():
     sys.argv = [0,0,0,0,0,0]
     sys.argv[1] = "SVM"
-    sys.argv[2] = "kappa"
+    sys.argv[2] = "accuracy"
     sys.argv[3] = "../datasets/preprocessed/iris.csv"
     return sys.argv[1], sys.argv[2], sys.argv[3]
 
@@ -35,8 +35,11 @@ data_csv = pd.read_csv(dataset_filename)
 encoded_dataset = encode_csv_dataset(data_csv)
 X, Y = extract_data(encoded_dataset)
 
+# Train Model
 fullx, fy = train(X, Y, classifier, metric)
-fy = np.reshape(fy, (len(fy), 1))
-print(fullx.shape, fy.shape)
-new_dataset = np.append(fullx, fy, axis=1)
+
+# Report results
+reshaped_fy = np.reshape(fy, (len(fy), 1))
+print(fullx.shape, reshaped_fy.shape)
+new_dataset = np.append(fullx, reshaped_fy, axis=1)
 pd.DataFrame(new_dataset).to_csv(sys.argv[3] + "_balanced.csv")

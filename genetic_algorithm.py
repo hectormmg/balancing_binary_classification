@@ -114,7 +114,7 @@ def initialize_specie(X, Y, X_class, XP_class, Y_value, N, is_minority):
     for i in range(0,N):
         Xf, Yf = prepare_data_for_training(X, Y, X, XP_class, population[i], is_minority, Y_value, True)
 
-        fitness = evaluate(Xf, Yf, X, Y, "SVM", "kappa", originalN)
+        fitness = evaluate(Xf, Yf, X, Y, "SVM", "kappa")
         population_fitnesses[i] = fitness
 
     return population, population_fitnesses
@@ -202,7 +202,7 @@ def train(X, Y, classifier, metric):
                 child_dataX = np.append(child_dataX, m_dataX, 0)
                 child_dataY = np.append(child_dataY, m_dataY, 0)
                 
-                child_fitness = evaluate(child_dataX, child_dataY, X, Y, classifier, metric, original_N)
+                child_fitness = evaluate(child_dataX, child_dataY, X, Y, classifier, metric)
 
                 # En caso de que el fitness del hijo sea mejor que alguno de los padres
                 # entonces quita ese padre de la poblacion y pon al hijo en su 
@@ -259,7 +259,7 @@ def train(X, Y, classifier, metric):
     X_new = np.append(X1, X2, 0)
     Y_new = np.append(Y1, Y2, 0)
     
-    best_fitness = evaluate(X_new, Y_new, X, Y, classifier, metric, original_N)
+    best_fitness = evaluate(X_new, Y_new, X, Y, classifier, metric)
     print("+ Era: ", positive_class.shape, "Es: ", X1.shape)
     print("- Era: ", negative_class.shape, "Es: ", X2.shape)
 
