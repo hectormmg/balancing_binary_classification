@@ -15,11 +15,13 @@ def read_system_params():
     sys.argv = [0,0,0,0,0,0]
     sys.argv[1] = "SVM"
     sys.argv[2] = "accuracy"
-    sys.argv[3] = "../datasets/preprocessed/iris.csv"
+    sys.argv[3] = "../datasets/preprocessed/abalone19.csv"
     return sys.argv[1], sys.argv[2], sys.argv[3]
 
 def encode_csv_dataset(data_csv):
-    data_csv["Class"] = np.where(data_csv["Class"] == "yes", 1, 0)
+    test_class = data_csv["Class"][0]
+    if(test_class == "yes" or test_class == "no" ):
+        data_csv["Class"] = np.where(data_csv["Class"] == "yes", 1, 0)
     return data_csv
 
 def extract_data(encoded_dataset):
@@ -29,7 +31,6 @@ def extract_data(encoded_dataset):
     
 
 # Main Script
-
 classifier, metric, dataset_filename = read_system_params()  
 data_csv = pd.read_csv(dataset_filename)              
 encoded_dataset = encode_csv_dataset(data_csv)

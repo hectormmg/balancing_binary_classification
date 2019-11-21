@@ -15,11 +15,11 @@ from sklearn.metrics import cohen_kappa_score
 from sklearn.metrics import f1_score
 
 def custom_accuracy_score(y_test, prediction, tp, fp, tn, fn):
-#        negative_accuracy = tp / (tp + tn)
-#        positive_accuracy = fp / (fp + fn)
-#
-#        return 0.5 * (negative_accuracy + positive_accuracy)
-    return (tp + tn) / (tp + fn + tn + fp)
+    accuracy_negative = tp / (tp + fn)
+    accuracy_positive = tn / (fp + tn)
+
+    fitness = 0.5 * (accuracy_negative + accuracy_positive)
+    return fitness
 
 def apply_metric(metric, y_test, prediction, tn, fp, fn, tp):
     if (metric == "accuracy"):
@@ -49,13 +49,9 @@ def evaluate(X_train, y_train, X_test, y_test, classifier, metric):
     
     positive_count = np.count_nonzero(y_train)
     negative_count = len(y_train) - positive_count
-    
 #   print("positive_count: ", positive_count, ", negative_count: ", negative_count, ", Total: ", len(y_train))
-    
     prediction = classify(X_train, y_train, X_test, y_test, classifier)
-
     tn, fp, fn, tp = confusion_matrix(y_test, prediction).ravel()
-    
     fitness = apply_metric(metric, y_test, prediction, tn, fp, fn, tp)
         
     return fitness - (0.1 * max(positive_count, negative_count) / min(positive_count, negative_count))

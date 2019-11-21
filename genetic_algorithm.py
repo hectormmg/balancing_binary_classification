@@ -16,27 +16,14 @@ from sklearn import svm
 import pandas as pd
 import random
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import roc_auc_score
-from sklearn.metrics import cohen_kappa_score
-from sklearn.metrics import f1_score
 
 from fitness import evaluate
+from fitness_statistics import FitnessStatistics
+from data_processing import *
+from species import Species
+from species_factory import SpeciesFactory
 
-    
-def initialize_population(N, M):
-    #Pon random individuals en un grupo.
-    population = np.zeros((N, M))
-    for i in range(0, N):
-        population[i, :] = create_random_individual(M)
-        #shuffle_individual(population[i, :], int( N / 10))
-#        # Prueba para que se hagan mas grupos
-#        rand = random.randint(0,(N-1)/2)
-#        indexes = np.random.randint(N, rand)
-        
-#        individual = np.where()
-    return population
+
 
 
 def crossover(individual1, individual2):
@@ -62,62 +49,10 @@ def mutation(individual, prob_mutation):
     else:
         individual = np.where(random.uniform(0,1) < prob_mutation,
                               individual,
-                              random.randint(0,len(individual) - 1)
-                              )
+                              random.randint(0,len(individual) - 1))
     
     return individual
 
-
-def prepare_data_for_training(X, Y, X_class, X_opposite_class, individual, is_minority, Y_value, initialization):
-    #Crea los grupos. 
-    if(initialization):
-        individual, groups = initialize_groups(individual)
-        graph = create_graph_from_individual(individual)
-        groups = graph_traversal(graph)
-    else:
-        graph = create_graph_from_individual(individual)
-        groups = graph_traversal(graph)
-        
-    prototypes = np.zeros((len(groups), len(X[0])))
-    # Una vez que tengamos todos los indices de cada grupo, haremos los nuevos 
-    # prototipos. 
-    for j in range(0,len(groups)):
-        if (len(groups[j]) > 0):
-            prototype = create_prototype(X, groups[j])
-            prototypes[j, :] = prototype  
-        
-    #Agrego nuevos prototypos.
-    if (is_minority):
-        X = np.append(X_class, prototypes, axis = 0)
-        Y_prototypes = np.full((len(prototypes),), Y_value)
-        Y = np.append(Y, Y_prototypes, axis = 0)
-        Y = np.transpose(Y)
-    else:
-        if X_opposite_class is not None:
-            X = np.append(X_opposite_class, prototypes, axis = 0)
-            Y_opposite = np.full(len(X_opposite_class), not Y_value)
-            Y_prototypes = np.full(len(prototypes), Y_value)
-            Y = np.append(Y_opposite, Y_prototypes)
-        else:
-            X = prototypes
-            Y = np.full(len(prototypes), Y_value)
-            
-    return X, Y
-
-    
-
-def initialize_specie(X, Y, X_class, XP_class, Y_value, N, is_minority):
-    
-    population = initialize_population(N, len(X_class))
-    population_fitnesses = np.zeros((N, 1))
-    originalN = len(Y)
-    for i in range(0,N):
-        Xf, Yf = prepare_data_for_training(X, Y, X, XP_class, population[i], is_minority, Y_value, True)
-
-        fitness = evaluate(Xf, Yf, X, Y, "SVM", "kappa")
-        population_fitnesses[i] = fitness
-
-    return population, population_fitnesses
 
 
 def binaryTournament(population, fitnesses, indexP1, indexP2):
@@ -130,61 +65,65 @@ def binaryTournament(population, fitnesses, indexP1, indexP2):
     
     return population[indexP2], indexP2
 
-def pick_parents(population, fitnesses):
+def pick_parents(population, species_fitnesses):
     #Para que los que tengan mayor fitness tengan mas probabilidad de ser seleccionados.    
-    parents= np.random.randint(0, len(population), 4)
+    parents = np.random.randint(0, len(population), 4)
    
     return parents[0], parents[1], parents[2], parents[3]
 
 def train(X, Y, classifier, metric):
+    
+    # Configure hyperparameters
     N = 100
     iterations = 100
     prob_mutation = 0.05
-    original_N = len(Y)
-    positive_class, negative_class = separate_by_class(X, Y, classifier != "G")
-    max_positive_fitness = []
-    max_negative_fitness = []
-    avg_positive_fitness = []
-    avg_negative_fitness = []
     
+    # Split dataset by class
+    positive_class, negative_class = split_dataset_by_class(X, Y, classifier != "G")
+    print(f'Positive Class Shape: {positive_class.shape}')
+    print(f'Negative Class Shape: {negative_class.shape}')
     
-    positive_P, positive_P_fitness = initialize_specie(X, Y, 
-                                                       positive_class, negative_class, 1, 100, 
-                                                       len(positive_class) < len(negative_class))
+    # Instantiate Fitness Statistics for reporting
+    fitness_statistics = FitnessStatistics()
     
-    negative_P, negative_P_fitness = initialize_specie(X, Y, 
-                                                       negative_class, positive_class, 0, 100, 
-                                                       len(negative_class) < len(positive_class))
+    # Flag determines whether positive class is minority
+    minority_flag = len(positive_class) < len(negative_class)
     
-    species = [positive_P, negative_P]
-    species_fitnesses = [positive_P_fitness, negative_P_fitness]
+    # Initialize positive and negative "species"
+    species = SpeciesFactory.initialize_species(X, Y, positive_class, negative_class, minority_flag)
     species_X = [positive_class, negative_class]
     species_Y = [np.full((len(positive_class),), 1), np.full((len(negative_class),), 0)]
     species_Y_value = [1, 0]
     
+    # Outer training loop
     while iterations:
-
-        for i in range(0, 2):
+        print(iterations)
+        # Loop between species (Positive/Negative)
+        for i in range(len(species)):
+            # Select current population
+            currentS = species[i]
+            currentS_fitness = currentS.population_fitnesses
             
-            currentP = species[i]
-            currentP_fitness = species_fitnesses[i]
-            is_minority = len(species_X[i]) < len(species_X[not i])
+            # Check if current species is minority
+            minority_flag = len(species_X[i]) < len(species_X[not i])
             
+            # Create random index
             random_index_m = random.randint(0, N-1 )
-            
+
             m_dataX, m_dataY = prepare_data_for_training(X, species_Y[not i], 
                                                          species_X[not i],
                                                          None,
-                                                         species[not i][random_index_m],
-                                                         (not is_minority),
+                                                         species[not i].population[random_index_m],
+                                                         (not minority_flag),
                                                          species_Y_value[not i],
                                                          False)
+            
             for j in range(0, N):
                 # Selecciona dos padres.
-                indexP1, indexP2, indexP3, indexP4 = pick_parents(currentP, currentP_fitness)
+                indexP1, indexP2, indexP3, indexP4 = pick_parents(currentS.population, currentS_fitness)
                 
-                parentA, indexA = binaryTournament(currentP, currentP_fitness, indexP1, indexP2)
-                parentB, indexB = binaryTournament(currentP, currentP_fitness, indexP3, indexP4)
+                parentA, indexA = binaryTournament(currentS.population, currentS_fitness, indexP1, indexP2)
+                parentB, indexB = binaryTournament(currentS.population, currentS_fitness, indexP3, indexP4)
                 
                 # Crea un offspring.
                 child = crossover(parentA, parentB)
@@ -193,7 +132,7 @@ def train(X, Y, classifier, metric):
                                                                      species_X[i],
                                                                      None,
                                                                      child,
-                                                                     is_minority,
+                                                                     minority_flag,
                                                                      species_Y_value[i],
                                                                      False)
                 
@@ -201,42 +140,41 @@ def train(X, Y, classifier, metric):
                 # Entrenamos con data de soluciones y probamos con dataset completo.
                 child_dataX = np.append(child_dataX, m_dataX, 0)
                 child_dataY = np.append(child_dataY, m_dataY, 0)
-                
                 child_fitness = evaluate(child_dataX, child_dataY, X, Y, classifier, metric)
 
                 # En caso de que el fitness del hijo sea mejor que alguno de los padres
                 # entonces quita ese padre de la poblacion y pon al hijo en su 
                 # posicion.
-                if child_fitness >= currentP_fitness[indexA] and child_fitness >= currentP_fitness[indexB]:
-                    if currentP_fitness[indexA] < currentP_fitness[indexB]:
+                if child_fitness >= currentS_fitness[indexA] and child_fitness >= currentS_fitness[indexB]:
+                    if currentS_fitness[indexA] < currentS_fitness[indexB]:
                         minIndex = indexA
                     else:
                         minIndex = indexB
                         
-                    currentP[minIndex] = child
-                    currentP_fitness[minIndex] = child_fitness
+                    currentS.population[minIndex] = child
+                    currentS_fitness[minIndex] = child_fitness
                     
-                elif child_fitness >= currentP_fitness[indexA]:
-                    currentP[indexA] = child
-                    currentP_fitness[indexA] = child_fitness
-                elif child_fitness >= currentP_fitness[indexB]:
-                    currentP[indexB] = child
-                    currentP_fitness[indexB] = child_fitness
+                elif child_fitness >= currentS_fitness[indexA]:
+                    currentS.population[indexA] = child
+                    currentS_fitness[indexA] = child_fitness
+                elif child_fitness >= currentS_fitness[indexB]:
+                    currentS.population[indexB] = child
+                    currentS_fitness[indexB] = child_fitness
                     
             
-            species_fitnesses[i] = currentP_fitness
-            species[i] = currentP
+            species[i].population_fitnesses = currentS_fitness
+            species[i] = currentS
             
         iterations = iterations - 1
-        max_positive_fitness.append(np.max(species_fitnesses[0]))
-        max_negative_fitness.append(np.max(species_fitnesses[1]))
-        avg_positive_fitness.append(np.mean(species_fitnesses[0]))
-        avg_negative_fitness.append(np.mean(species_fitnesses[1]))
+        fitness_statistics.max_positive.append(np.max(species[0].population_fitnesses))
+        fitness_statistics.max_negative.append(np.max(species[1].population_fitnesses))
+        fitness_statistics.avg_positive.append(np.mean(species[0].population_fitnesses))
+        fitness_statistics.avg_negative.append(np.mean(species[1].population_fitnesses))
 
             
                 
-    positive_class_solution = species[0][np.argmax(species_fitnesses[0])]
-    negative_class_solution = species[1][np.argmax(species_fitnesses[1])]
+    positive_class_solution = species[0].population[np.argmax(species[0].population_fitnesses)]
+    negative_class_solution = species[1].population[np.argmax(species[1].population_fitnesses)]
     
 
     # Regresamos el dataset de la solucion.
@@ -260,17 +198,25 @@ def train(X, Y, classifier, metric):
     Y_new = np.append(Y1, Y2, 0)
     
     best_fitness = evaluate(X_new, Y_new, X, Y, classifier, metric)
-    print("+ Era: ", positive_class.shape, "Es: ", X1.shape)
-    print("- Era: ", negative_class.shape, "Es: ", X2.shape)
-
-    print("Total Era: ", X.shape, "Es: ", X_new.shape)
+    print("Original size: ", X.shape, "Balanced size: ", X_new.shape)
+    print("Original Positive Count: ",
+          positive_class.shape[0],
+          f'{round((positive_class.shape[0]/X.shape[0])*100, 2)}%',
+          "Balanced Positive Count: ",
+          X1.shape[0],
+          f'{round((X1.shape[0]/X_new.shape[0])*100, 2)}%')
+    print("Original Negative Count: ",
+          negative_class.shape[0],
+          f'{round((negative_class.shape[0]/X.shape[0])*100, 2)}%',
+          "Balanced Negative Count: ",
+          X2.shape[0],
+          f'{round((X2.shape[0]/X_new.shape[0])*100, 2)}%')
+#    print("+ Era: ", positive_class.shape, "Es: ", X1.shape)
+#    print("- Era: ", negative_class.shape, "Es: ", X2.shape)
+#
+#    print("Total Era: ", X.shape, "Es: ", X_new.shape)
     print("fitness: ", best_fitness)
     
-     ### Esto lo pongo por mientras para que podamos ver como jalo.
-    plt.plot(max_negative_fitness, label = "Negative fitness")
-    plt.plot(max_positive_fitness, label = "Positive fitness")
-    plt.plot(avg_positive_fitness, label = "Average Positive fitness")
-    plt.plot(avg_negative_fitness, label = "Average Negative fitness")
-    plt.legend()
+    fitness_statistics.plot_all()
     
     return X_new, Y_new
