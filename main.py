@@ -11,12 +11,24 @@ import numpy as np
 
 from genetic_algorithm import train
 
-def read_system_params():
-    sys.argv = [0,0,0,0,0,0]
-    sys.argv[1] = "SVM"
-    sys.argv[2] = "accuracy"
-    sys.argv[3] = "../datasets/preprocessed/abalone19.csv"
-    return sys.argv[1], sys.argv[2], sys.argv[3]
+def print_configuration(target_config):
+    print(f'Classifier: {target_config["classifier"]}')
+    print(f'Fitness Metric: {target_config["metric"]}')
+    print(f'Dataset Location: {target_config["dataset_filename"]}\n')
+
+def read_system_params(default_config):
+    if(len(sys.argv) == 4):   
+        config = dict()
+        config['classifier'] = sys.argv[1]
+        config['metric'] = sys.argv[2]
+        config['dataset_filename'] = sys.argv[3]
+        print("Executing CO-evolutionary Algorithm with custom options:")
+        print_configuration(config)
+        return config
+    else:
+        print("Executing Co-evolutionary Algorithm with default options:")
+        print_configuration(default_config)
+        return default_config
 
 def encode_csv_dataset(data_csv):
     test_class = data_csv["Class"][0]
@@ -28,19 +40,24 @@ def extract_data(encoded_dataset):
     X = np.array(encoded_dataset.iloc[:, 0:-1])
     Y = np.array(encoded_dataset.iloc[:, -1])
     return X, Y
-    
+
 
 # Main Script
-classifier, metric, dataset_filename = read_system_params()  
-data_csv = pd.read_csv(dataset_filename)              
+default_config = { 'classifier': "SVM",
+                   'metric': "accuracy",
+                   'dataset_filename': "../datasets/preprocessed/iris.csv" }
+
+config = read_system_params(default_config) 
+data_csv = pd.read_csv(config['dataset_filename'])              
 encoded_dataset = encode_csv_dataset(data_csv)
 X, Y = extract_data(encoded_dataset)
 
+
+
 # Train Model
-fullx, fy = train(X, Y, classifier, metric)
+fullx, fy, best_fitness, shapes = train(X, Y, config['classifier'], config['metric'])
 
 # Report results
 reshaped_fy = np.reshape(fy, (len(fy), 1))
-print(fullx.shape, reshaped_fy.shape)
 new_dataset = np.append(fullx, reshaped_fy, axis=1)
-pd.DataFrame(new_dataset).to_csv(sys.argv[3] + "_balanced.csv")
+pd.DataFrame(new_dataset).to_csv(config["dataset_filename"] + "_balanced.csv")

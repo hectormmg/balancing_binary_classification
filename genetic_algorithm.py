@@ -80,8 +80,11 @@ def train(X, Y, classifier, metric):
     
     # Split dataset by class
     positive_class, negative_class = split_dataset_by_class(X, Y, classifier != "G")
-    print(f'Positive Class Shape: {positive_class.shape}')
-    print(f'Negative Class Shape: {negative_class.shape}')
+    positive_count = positive_class.shape[0]
+    negative_count = negative_class.shape[0]
+    example_count = positive_count + negative_count
+    print(f'Initial Positive Class Count: {positive_count} examples ({round(positive_count/example_count * 100, 2)}%)')
+    print(f'Initial Negative Class Count: {negative_count} examples ({round(negative_count/example_count * 100, 2)}%)\n')
     
     # Instantiate Fitness Statistics for reporting
     fitness_statistics = FitnessStatistics()
@@ -96,8 +99,11 @@ def train(X, Y, classifier, metric):
     species_Y_value = [1, 0]
     
     # Outer training loop
-    while iterations:
-        print(iterations)
+    current_iteration = 1
+    print(f'Starting iteration {current_iteration} out of {iterations}')
+    while current_iteration <= iterations:
+        if (current_iteration%10 == 0):
+            print(f'Starting iteration {current_iteration} out of {iterations}')
         # Loop between species (Positive/Negative)
         for i in range(len(species)):
             # Select current population
@@ -165,7 +171,7 @@ def train(X, Y, classifier, metric):
             species[i].population_fitnesses = currentS_fitness
             species[i] = currentS
             
-        iterations = iterations - 1
+        current_iteration += 1
         fitness_statistics.max_positive.append(np.max(species[0].population_fitnesses))
         fitness_statistics.max_negative.append(np.max(species[1].population_fitnesses))
         fitness_statistics.avg_positive.append(np.mean(species[0].population_fitnesses))
@@ -198,25 +204,26 @@ def train(X, Y, classifier, metric):
     Y_new = np.append(Y1, Y2, 0)
     
     best_fitness = evaluate(X_new, Y_new, X, Y, classifier, metric)
-    print("Original size: ", X.shape, "Balanced size: ", X_new.shape)
+    shapes = {"p_orig": positive_class.shape[0],
+              "n_orig": negative_class.shape[0],
+              "p_new": X1.shape[0],
+              "n_new": X2.shape[0]}
+    
+    print("\nOriginal size: ", X.shape, "Balanced size: ", X_new.shape)
     print("Original Positive Count: ",
-          positive_class.shape[0],
-          f'{round((positive_class.shape[0]/X.shape[0])*100, 2)}%',
-          "Balanced Positive Count: ",
-          X1.shape[0],
-          f'{round((X1.shape[0]/X_new.shape[0])*100, 2)}%')
+          shapes["p_orig"],
+          f'examples ({round((positive_class.shape[0]/X.shape[0])*100, 2)}%)',
+          "\nBalanced Positive Count: ",
+          shapes["p_new"],
+          f'examples ({round((X1.shape[0]/X_new.shape[0])*100, 2)}%)')
     print("Original Negative Count: ",
-          negative_class.shape[0],
-          f'{round((negative_class.shape[0]/X.shape[0])*100, 2)}%',
-          "Balanced Negative Count: ",
-          X2.shape[0],
-          f'{round((X2.shape[0]/X_new.shape[0])*100, 2)}%')
-#    print("+ Era: ", positive_class.shape, "Es: ", X1.shape)
-#    print("- Era: ", negative_class.shape, "Es: ", X2.shape)
-#
-#    print("Total Era: ", X.shape, "Es: ", X_new.shape)
-    print("fitness: ", best_fitness)
+          shapes["n_orig"],
+          f'examples ({round((negative_class.shape[0]/X.shape[0])*100, 2)}%)',
+          "\nBalanced Negative Count: ",
+          shapes["n_new"],
+          f'examples ({round((X2.shape[0]/X_new.shape[0])*100, 2)}%)')
+    print("Balanced Dataset Fitness: ", round(best_fitness, 2))
     
     fitness_statistics.plot_all()
     
-    return X_new, Y_new
+    return X_new, Y_new, best_fitness, shapes
