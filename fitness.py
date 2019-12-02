@@ -9,6 +9,7 @@ import sys
 import numpy as np
 from sklearn import svm
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import cohen_kappa_score
@@ -29,7 +30,7 @@ def apply_metric(metric, y_test, prediction, tn, fp, fn, tp):
     elif (metric == "auc"):
         fitness = roc_auc_score(y_test, prediction)
     elif (metric == "f1"):
-        fitness = f1_score(y_test, prediction, average='macro')
+        fitness = f1_score(y_test, prediction, average='macro', labels=np.unique(prediction))
     
     if np.isnan(fitness):
         fitness = 0.0
